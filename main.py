@@ -8,7 +8,7 @@ import customtkinter as ctk
 import threading
 import tkinter as tk
 from PIL import ImageGrab, Image, ImageTk
-from tinker import DotaAFKBot
+from hero_bot import HeroBot
 from game_data import GameData
 
 ctk.set_appearance_mode("Dark")
@@ -29,8 +29,7 @@ class BotManagerApp(ctk.CTk):
         self.gsi = GameData()
         self.gsi.start()
 
-        self.afk_bot:DotaAFKBot = DotaAFKBot(log_callback=self.log_message)
-        self.afk_bot.game_data = self.gsi
+        self.hero_bot:HeroBot = HeroBot(self.gsi, log_callback=self.log_message)
         
         self.accept_templates_dir: str = "img/accept_btn/"
         self.play_btn_templates_dir: str = "img/play_btn/"
@@ -102,10 +101,8 @@ class BotManagerApp(ctk.CTk):
                                         fg_color="red", state="disabled", corner_radius=0)
         self.stop_button.pack(side="left", padx=10)
 
-        self.change_lane_btn = ctk.CTkButton(button_frame, text="Change lane to random", 
-                                        command=self.change_lane_to_random, width=120, 
-                                        fg_color="green", corner_radius=0)
-        self.change_lane_btn.pack(side="left", padx=10)
+        self.ingame_label = ctk.CTkLabel(main_frame, text="Ingame: False", font=ctk.CTkFont(size=14, weight="bold"))
+        self.ingame_label.pack(padx=10)
 
         log_label = ctk.CTkLabel(main_frame, text="Actions:", 
                                 font=ctk.CTkFont(size=14, weight="bold"))
@@ -115,9 +112,6 @@ class BotManagerApp(ctk.CTk):
         self.log_text.pack(fill="both", expand=True, pady=10)
         self.log_text.configure(state="disabled")
     
-    def change_lane_to_random(self):
-        if self.ingame:
-            self.afk_bot.change_lane_to_random()
 
     def log_message(self, message: str):
         self.after(0, self._add_log_message, message)
@@ -144,7 +138,7 @@ class BotManagerApp(ctk.CTk):
             self.running = False
             self.start_button.configure(state="normal")
             self.stop_button.configure(state="disabled")
-            self.status_label.configure(text="Статус: Остановлен")
+            self.status_label.configure(text="Status: Inactive")
             self.log_message("Bot stopped")
 
     
@@ -201,6 +195,9 @@ class BotManagerApp(ctk.CTk):
         self.log_message("Bot loop started")
         try:
             while self.running:
+                self.ingame_label.configure(text=f"Ingame: {self.ingame}")
+
+
                 if not self.ingame:
                     if self.find_picture(self.get_images_from_directory(self.play_btn_templates_dir), 
                                         click=True, debug_name="Play Button"):
@@ -218,16 +215,13 @@ class BotManagerApp(ctk.CTk):
                                         click=True, debug_name="Random Hero"):
                         continue
                 
-                self.find_picture(self.get_images_from_directory(self.up_spell_templates_dir), 
-                                click=True, debug_name="Upgrade Spell")
                 
                 self.ingame = self.check_ingame()
                 self.log_message("Ingame: " + str(self.ingame))
 
-                print(self.gsi.data)
 
                 if self.ingame:
-                    self.afk_bot.run_in_game()
+                    self.hero_bot.run_in_game()
                 
                 time.sleep(random.uniform(1, 2))
         except Exception as e:

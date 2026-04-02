@@ -1,12 +1,15 @@
 from flask import Flask, request
 import threading
 import logging
+from typing import Optional, Callable
 
 class GameData:
     def __init__(self, port=3000):
         self.app = Flask(__name__)
         self.port = port
-        self.data = {} # Сюда Дота будет присылать JSON
+        self.data = {}
+
+        self.on_update_callback: Optional[Callable[[dict], None]] = None
         
         # Отключаем спам Flask в консоль
         log = logging.getLogger('werkzeug')
@@ -15,7 +18,13 @@ class GameData:
         # Маршрут, на который Дота шлет POST-запросы
         @self.app.route('/', methods=['POST'])
         def update():
-            self.data = request.json
+            new_data = request.json
+
+            self.data = new_data
+
+            if self.on_update_callback:
+                self.on_update_callback(self.data)
+            
             return '', 200
 
     def start(self):
@@ -53,3 +62,25 @@ class GameData:
     def is_ingame(self) -> bool:
         # Проверка, находится ли игрок непосредственно в матче
         return self.map_name != ""
+
+    @property
+    def team(self) -> str:
+        """Возвращает 'radiant', 'dire' или 'none'"""
+        # Данные лежат в player -> team_name
+        return self.data.get('player', {}).get('team_name', "none").lower()
+
+    @property
+    def is_radiant(self) -> bool:
+        return self.team == "radiant"
+
+    @property
+    def is_dire(self) -> bool:
+        return self.team == "dire"
+
+    @property
+    def position(self) -> tuple[float, float]:
+        """Возвращает (x, y) героя на карте Доты (от -8000 до 8000)"""
+        pos = self.data.get('hero', {}).get('xpos'), self.data.get('hero', {}).get('ypos')
+        if pos[0] is not None:
+            return float(pos[0]), float(pos[1])
+        return 0.0, 0.0
