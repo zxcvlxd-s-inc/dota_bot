@@ -11,6 +11,8 @@ from PIL import ImageGrab, Image, ImageTk
 import json
 from pathlib import Path
 
+import pygetwindow as gw
+
 from rect_select import ScreenRectSelector
 from overlay_visualizer import OverlayVisualizer
 
@@ -23,26 +25,37 @@ from custom_math import Vector
 ctk.set_appearance_mode("Dark")
 ctk.set_default_color_theme("green")
 
-world_points = {
-    "radiant_base": (-6883.0, -6375.0),
-    "dire_base": (6791.0, 6359.0),
-    }
 
+main_font = ("Consolas", 16, "bold")
 
 class BotManagerApp(ctk.CTk):
     def __init__(self):
         super().__init__()
+        self.protocol("WM_DELETE_WINDOW", self.on_closing)
         
         self.title("Bot Manager")
         self.geometry("600x800")
         self.set_app_icon("icon.png")
 
+        self.world_rects = {}
+
         self.calibration_file = Path("calibration.json")
-        self.world_rects = self.load_calibration() or {
-            "map_rect": Rect(Vector(159, 756), Vector(233, 233)),
-            "radiant_base": Rect(Vector(175, 954), Vector(13, 13)),
-            "dire_base": Rect(Vector(363, 786), Vector(7, 7)),
-        }
+        if not self.load_calibration():
+            self.world_rects = {
+                "map_rect": Rect(Vector(159, 756), Vector(233, 233)),
+
+                "radiant_base": Rect(Vector(175, 954), Vector(13, 13)),
+                "dire_base": Rect(Vector(363, 786), Vector(7, 7)),
+
+                "radiant_safe_lane": Rect(Vector(363, 786), Vector(7, 7)),
+                "dire_safe_lane": Rect(Vector(363, 786), Vector(7, 7)),
+
+                "radiant_mid_lane": Rect(Vector(363, 786), Vector(7, 7)),
+                "dire_mid_lane": Rect(Vector(363, 786), Vector(7, 7)),
+
+                "radiant_hard_lane": Rect(Vector(363, 786), Vector(7, 7)),
+                "dire_hard_lane": Rect(Vector(363, 786), Vector(7, 7)),
+            }
 
         self.overlay = OverlayVisualizer(self.world_rects, scale=0.6)
  
@@ -53,7 +66,7 @@ class BotManagerApp(ctk.CTk):
         self.gsi = GameData()
         self.gsi.start()
 
-        self.hero_bot:HeroBot = HeroBot(self.gsi, world_points, log_callback=self.log_message)
+        self.hero_bot:HeroBot = HeroBot(self.gsi, self.world_rects, log_callback=self.log_message)
         
         self.accept_templates_dir: str = "img/accept_btn/"
         self.play_btn_templates_dir: str = "img/play_btn/"
@@ -68,6 +81,11 @@ class BotManagerApp(ctk.CTk):
 
         self.setup_ui()
 
+    def on_closing(self):
+        self.overlay.stop()
+        self.running = False
+        self.destroy()
+
     def select_rect(self, rect_name: str):
         self.rect_selector.select_rect(rect_name, self.on_rect_selected)
 
@@ -75,7 +93,6 @@ class BotManagerApp(ctk.CTk):
         self.world_rects[name] = rect
         self.save_calibration()
         self.overlay.update_rects(self.world_rects)
-
 
     def save_calibration(self):
         data = {}
@@ -95,21 +112,21 @@ class BotManagerApp(ctk.CTk):
         except Exception as e:
             self.log_message(f"Error saving calibration.json: {e}")
 
-    def load_calibration(self):
+    def load_calibration(self) -> bool:
         if not self.calibration_file.exists():
-            return None
+            return False
         try:
             data = json.loads(self.calibration_file.read_text(encoding="utf-8"))
-            rects = {}
             for name, values in data.items():
                 pos = Vector(values["x"], values["y"])
                 size = Vector(values["w"], values["h"])
-                rects[name] = Rect(pos, size)
+                self.world_rects[name] = Rect(pos, size)
             self.log_message(f"Loaded calibration.json form: {self.calibration_file}")
-            return rects
+            
+            return True
         except Exception as e:
             self.log_message(f"Error loading calibration.json: {e}")
-            return None
+            return False
 
     def set_app_icon(self, icon_filename: str):
         try:
@@ -132,40 +149,55 @@ class BotManagerApp(ctk.CTk):
                         pass
                         
             else:
-                print(f"Файл иконки не найден: {icon_filename}")
+                pass
                 
         except Exception as e:
-            print(f"Ошибка установки иконки: {e}")
+            pass
+
+    def is_dota_active(self) -> bool:
+        try:
+            active_window = gw.getActiveWindow()
+            if not active_window:
+                return False
+
+            window_title = active_window.title.lower()
+
+            if "dota2" in window_title or "dota 2" in window_title:
+                return True
+
+            return False
+        except Exception as e:
+            return False
 
     def convert_png_to_ico(self, png_path: str, ico_path: str):
         try:
             img = Image.open(png_path)
             img.save(ico_path, format='ICO', sizes=[(16, 16), (32, 32), (48, 48), (64, 64)])
         except Exception as e:
-            print(f"Ошибка конвертации PNG в ICO: {e}")
+            pass
 
     def setup_ui(self):
         main_frame = ctk.CTkFrame(self, corner_radius=0, fg_color="black")
         main_frame.pack(fill="both", expand=True, padx=20, pady=20)
 
         
-        title_label = ctk.CTkLabel(main_frame, text="Dota 2 AFK Bot Manager", 
-                                  font=ctk.CTkFont(size=24, weight="bold"))
+        title_label = ctk.CTkLabel(main_frame, text="Dota 2 AFK Bot Manager",
+                                  font=main_font)
         title_label.pack(pady=20)
         
-        self.status_label = ctk.CTkLabel(main_frame, text="Status: Inactive", 
-                                        font=ctk.CTkFont(size=16))
+        self.status_label = ctk.CTkLabel(main_frame, text="Status: Inactive",
+                                        font=main_font,)
         self.status_label.pack(pady=10)
         
         button_frame = ctk.CTkFrame(main_frame, fg_color="transparent", corner_radius=0)
         button_frame.pack(pady=20)
         
-        self.start_button = ctk.CTkButton(button_frame, text="Start", 
+        self.start_button = ctk.CTkButton(button_frame, text="Start", font=main_font,
                                          command=self.start_bot, width=120, corner_radius=0)
         self.start_button.pack(side="left", padx=10)
         
         self.stop_button = ctk.CTkButton(button_frame, text="Stop", 
-                                        command=self.stop_bot, width=120, 
+                                        command=self.stop_bot, width=120, font=main_font,
                                         fg_color="red", state="disabled", corner_radius=0)
         self.stop_button.pack(side="left", padx=10)
 
@@ -173,26 +205,31 @@ class BotManagerApp(ctk.CTk):
         calibrate_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
         calibrate_frame.pack(pady=10, fill="x")
 
-        calibrate_map_btn = ctk.CTkButton(calibrate_frame, text="Калибровать карту",
-                                          command=lambda: self.select_rect("map_rect"))
-        calibrate_map_btn.pack(pady=2, fill="x")
+        for rect_name in self.world_rects:
+            calibrate_btn = ctk.CTkButton(
+                calibrate_frame,
+                text=f"Calibrate {rect_name}",
+                font=main_font,
+                command=lambda name=rect_name: self.select_rect(name)
+            )
+            calibrate_btn.pack(pady=2, fill="x")
 
         """ ------ """
 
-        self.ingame_label = ctk.CTkLabel(main_frame, text="Ingame: False", font=ctk.CTkFont(size=14, weight="bold"))
+        self.ingame_label = ctk.CTkLabel(main_frame, text="Ingame: False", font=main_font)
         self.ingame_label.pack(padx=10)
 
-        log_label = ctk.CTkLabel(main_frame, text="Actions:", 
-                                font=ctk.CTkFont(size=14, weight="bold"))
-        log_label.pack(pady=(30, 10), anchor="w")
-        
-        self.log_text = ctk.CTkTextbox(main_frame, height=300, corner_radius=0)
+
+        """ Logging """
+        self.log_text = ctk.CTkTextbox(
+            main_frame,
+            height=300, corner_radius=0, font=("Consolas", 16, "bold"))
         self.log_text.pack(fill="both", expand=True, pady=10)
         self.log_text.configure(state="disabled")
-
+        """ ------ """
 
         """ Overlay """
-        self.overlay_button = ctk.CTkButton(calibrate_frame, text="Показать оверлей (F1)",
+        self.overlay_button = ctk.CTkButton(calibrate_frame, text="Show overlay (F1)", font=main_font,
                                             command=self.toggle_overlay, fg_color="purple")
         self.overlay_button.pack(pady=10, fill="x")
 
@@ -284,10 +321,10 @@ class BotManagerApp(ctk.CTk):
         self.log_message("Bot loop started")
         try:
             while self.running:
-                self.ingame_label.configure(text=f"Ingame: {self.ingame}")
+                self.ingame_label.configure(text=f"State: {self.gsi.game_state}")
 
 
-                if not self.ingame:
+                if self.gsi.game_state == "main_menu":
                     if self.find_picture(self.get_images_from_directory(self.play_btn_templates_dir), 
                                         click=True, debug_name="Play Button"):
                         continue
@@ -299,17 +336,18 @@ class BotManagerApp(ctk.CTk):
                     if self.find_picture(self.get_images_from_directory(self.accept_templates_dir), 
                                         click=True, debug_name="Accept Game"):
                         continue
-                    
+                
+                elif self.gsi.game_state == "hero_selection":
                     if self.find_picture(self.get_images_from_directory(self.rand_hero_templates_dir), 
                                         click=True, debug_name="Random Hero"):
                         continue
                 
                 
                 self.ingame = self.check_ingame()
-                if self.ingame:
+                if self.ingame and self.is_dota_active():
                     self.hero_bot.run_in_game()
                 
-                time.sleep(random.uniform(1, 2))
+                time.sleep(0.5)
 
         except Exception as e:
             self.log_message(f"Bot loop error: {e}")

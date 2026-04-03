@@ -23,6 +23,7 @@ class GameData:
             if self.on_update_callback:
                 self.on_update_callback(self.data)
             
+            
             return '', 200
 
     def start(self):
@@ -33,7 +34,42 @@ class GameData:
     def _run(self):
         self.app.run(port=self.port, debug=False, use_reloader=False)
 
-    
+
+    @property
+    def game_state(self) -> str:
+        """
+        - "main_menu"
+        - "lobby"               → Лобби (ожидание старта)
+        - "hero_selection"      → Выбор героя
+        - "strategy_time"       → Время стратегии (pre-game)
+        - "team_showcase"       → Показ героев
+        - "pregame"             → Герои выбраны, карта загружается
+        - "in_game"             → Игра идёт
+        - "post_game"           → Игра закончилась
+        - "unknown"             → Неизвестное состояние
+        """
+        map_data = self.data.get('map', {})
+        game_state_raw = map_data.get('game_state', "")
+        
+        state_map = {
+            "DOTA_GAMERULES_STATE_INIT": "main_menu",
+            "DOTA_GAMERULES_STATE_HERO_SELECTION": "hero_selection",
+            "DOTA_GAMERULES_STATE_STRATEGY_TIME": "strategy_time",
+            "DOTA_GAMERULES_STATE_TEAM_SHOWCASE": "team_showcase",
+            "DOTA_GAMERULES_STATE_PRE_GAME": "pregame",
+            "DOTA_GAMERULES_STATE_GAME_IN_PROGRESS": "in_game",
+            "DOTA_GAMERULES_STATE_POST_GAME": "post_game",
+            "DOTA_GAMERULES_STATE_CUSTOM_GAME_SETUP": "lobby",
+        }
+
+        state = state_map.get(game_state_raw, "unknown")
+
+        if state == "unknown":
+            if not map_data.get("name"):
+                return "main_menu"
+
+        return state
+
     @property
     def gold(self) -> int:
         return self.data.get('player', {}).get('gold', 0)

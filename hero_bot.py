@@ -8,8 +8,10 @@ from typing import Callable, Optional
 from timer import Timer
 from game_data import GameData
 
+from custom_math import Vector, Rect
+
 class HeroBot:
-    def __init__(self, game_data:GameData, world_points, log_callback: Optional[Callable[[str], None]] = None):
+    def __init__(self, game_data:GameData, world_points:dict[str, Rect], log_callback: Optional[Callable[[str], None]] = None):
         self.log_callback = log_callback
         self.game_data:GameData = game_data
 
@@ -43,24 +45,26 @@ class HeroBot:
         screen_x = int(MINIMAP_X_START + (norm_x * MINIMAP_WIDTH))
         screen_y = int(MINIMAP_Y_START + (norm_y * MINIMAP_HEIGHT))
         
-        print(screen_x, screen_y)
         return screen_x, screen_y
 
     def move_to_world_pos(self, x, y):
         screen_x, screen_y = self.world_to_minimap(x, y)
-        pyautogui.click(screen_x, screen_y, button='right')
+        self.human_click(screen_x, screen_y, mouse_button="right")
 
 
     """ Goto fountain """
     def go_to_radiant_fountain(self):
-        vec = self.world_points["radiant_base"] 
-        self.move_to_world_pos(vec[0], vec[1])
+        rect:Rect = self.world_points["radiant_base"]
+        pos = rect.get_random_point()
+        self.human_click(pos.x, pos.y, mouse_button="right")
 
     def go_to_dire_fountain(self):
-        vec = self.world_points["dire_base"] 
-        self.move_to_world_pos(vec[0], vec[1])
+        rect:Rect = self.world_points["dire_base"]
+        pos = rect.get_random_point()
+        self.human_click(pos.x, pos.y, mouse_button="right")
 
     def auto_go_to_fountain(self):
+        self.select_hero()
         if self.game_data.is_radiant:
             self.go_to_radiant_fountain()
         else:
@@ -74,32 +78,34 @@ class HeroBot:
     def can_farm_jungle(self):
         return self.game_data.level >= 10
 
-    def human_move_mouse(self, xyxy:list[int], move_time:list[float] = [0.3, 0.5], press:bool = False, key=""):
-        map_x = random.randint(xyxy[0], xyxy[1])
-        map_y = random.randint(xyxy[2], xyxy[3])
-        time_aa = random.uniform(move_time[0], move_time[1]) 
-        pyautogui.moveTo(map_x, map_y, duration=time_aa)
-        if press:
-            if key == "mouse1":
-                pyautogui.click()
-                return
-            elif key == "mouse2":
-                pyautogui.click(button="right")
-                return
-            pyautogui.press(key)
+    def select_hero(self, move_camera:bool = True):
+        pyautogui.press("1")
+        if move_camera:
+            time.sleep(0.1)
+            pyautogui.press("1")
+
+
+    def human_click(self, x, y, mouse_button = "left"):
+        pyautogui.moveTo(
+            x + random.randint(-5, 5),
+            y + random.randint(-5, 5),
+            duration=random.uniform(0.1, 0.4)
+        )
+
+        time.sleep(random.uniform(0.05, 0.2))
+        pyautogui.click(button=mouse_button)
+
 
     def on_update(self, _data = None):
-        #if self.game_data.health_percent <= 50:
-        #    self.auto_go_to_fountain()
+        if self.game_data.health_percent <= 50:
+            self.auto_go_to_fountain()
         pass
 
 
     def should_act(self):
-        current_time = time.time()
-        if current_time - self.last_action_time > self.action_interval:
-            self.last_action_time = current_time
-            self.action_interval = random.randint(2, 5)
+        if self.game_data.game_state == "in_game":
             return True
+
         return False
     
     def run_in_game(self):
