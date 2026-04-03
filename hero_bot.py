@@ -9,14 +9,12 @@ from timer import Timer
 from game_data import GameData
 
 class HeroBot:
-    def __init__(self, game_data:GameData, log_callback: Optional[Callable[[str], None]] = None):
+    def __init__(self, game_data:GameData, world_points, log_callback: Optional[Callable[[str], None]] = None):
         self.log_callback = log_callback
         self.game_data:GameData = game_data
 
-        self.world_points = {
-            "radiant_base": (-6883.0, -6375.0),
-            "dire_base": (6791.0, 6359.0),
-        }
+
+        self.world_points = world_points
 
         self.game_data.on_update_callback = self.on_update
 

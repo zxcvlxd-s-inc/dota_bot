@@ -11,8 +11,16 @@ from PIL import ImageGrab, Image, ImageTk
 from hero_bot import HeroBot
 from game_data import GameData
 
+from custom_math import Rect
+from custom_math import Vector
+
 ctk.set_appearance_mode("Dark")
 ctk.set_default_color_theme("green")
+
+world_points = {
+    "radiant_base": (-6883.0, -6375.0),
+    "dire_base": (6791.0, 6359.0),
+    }
 
 
 class BotManagerApp(ctk.CTk):
@@ -20,16 +28,23 @@ class BotManagerApp(ctk.CTk):
         super().__init__()
         
         self.title("Bot Manager")
-        self.geometry("800x600")
+        self.geometry("600x400")
         self.set_app_icon("icon.png")
-        
+
+        self.world_rects = {
+            "map_rect": Rect(Vector(159, 756), Vector(233, 233)),
+            "radiant_base": Rect(Vector(175, 954), Vector(13, 13)),
+            "dire_base": Rect(Vector(363, 786), Vector(7, 7)),
+        }
+ 
+
         self.ingame: bool = False
         self.running: bool = False
         
         self.gsi = GameData()
         self.gsi.start()
 
-        self.hero_bot:HeroBot = HeroBot(self.gsi, log_callback=self.log_message)
+        self.hero_bot:HeroBot = HeroBot(self.gsi, world_points, log_callback=self.log_message)
         
         self.accept_templates_dir: str = "img/accept_btn/"
         self.play_btn_templates_dir: str = "img/play_btn/"
@@ -42,6 +57,11 @@ class BotManagerApp(ctk.CTk):
         
         self.setup_ui()
     
+
+    def select_rect(self, rect_name: str):
+        result_rect:Rect = None
+        
+        self.world_rects[rect_name] = result_rect
 
     def set_app_icon(self, icon_filename: str):
         try:
