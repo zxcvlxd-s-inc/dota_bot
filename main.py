@@ -8,6 +8,12 @@ import customtkinter as ctk
 import threading
 import tkinter as tk
 from PIL import ImageGrab, Image, ImageTk
+import json
+from pathlib import Path
+
+from rect_select import ScreenRectSelector
+from overlay_visualizer import OverlayVisualizer
+
 from hero_bot import HeroBot
 from game_data import GameData
 
@@ -28,14 +34,17 @@ class BotManagerApp(ctk.CTk):
         super().__init__()
         
         self.title("Bot Manager")
-        self.geometry("600x400")
+        self.geometry("600x800")
         self.set_app_icon("icon.png")
 
-        self.world_rects = {
+        self.calibration_file = Path("calibration.json")
+        self.world_rects = self.load_calibration() or {
             "map_rect": Rect(Vector(159, 756), Vector(233, 233)),
             "radiant_base": Rect(Vector(175, 954), Vector(13, 13)),
             "dire_base": Rect(Vector(363, 786), Vector(7, 7)),
         }
+
+        self.overlay = OverlayVisualizer(self.world_rects, scale=0.6)
  
 
         self.ingame: bool = False
@@ -55,13 +64,52 @@ class BotManagerApp(ctk.CTk):
         self.shop_templates_dir: str = "img/shop/"
         self.dota_ui_templates_dir: str = "img/dota_ui/"
         
+        self.rect_selector = ScreenRectSelector()
+
         self.setup_ui()
-    
 
     def select_rect(self, rect_name: str):
-        result_rect:Rect = None
-        
-        self.world_rects[rect_name] = result_rect
+        self.rect_selector.select_rect(rect_name, self.on_rect_selected)
+
+    def on_rect_selected(self, name: str, rect: Rect):
+        self.world_rects[name] = rect
+        self.save_calibration()
+        self.overlay.update_rects(self.world_rects)
+
+
+    def save_calibration(self):
+        data = {}
+        for key, rect in self.world_rects.items():
+            data[key] = {
+                "x": int(rect.position.x),
+                "y": int(rect.position.y),
+                "w": int(rect.size.x),
+                "h": int(rect.size.y)
+            }
+        try:
+            self.calibration_file.write_text(
+                json.dumps(data, indent=2, ensure_ascii=False),
+                encoding="utf-8"
+            )
+            self.log_message(f"Saved calibration.json: {self.calibration_file}")
+        except Exception as e:
+            self.log_message(f"Error saving calibration.json: {e}")
+
+    def load_calibration(self):
+        if not self.calibration_file.exists():
+            return None
+        try:
+            data = json.loads(self.calibration_file.read_text(encoding="utf-8"))
+            rects = {}
+            for name, values in data.items():
+                pos = Vector(values["x"], values["y"])
+                size = Vector(values["w"], values["h"])
+                rects[name] = Rect(pos, size)
+            self.log_message(f"Loaded calibration.json form: {self.calibration_file}")
+            return rects
+        except Exception as e:
+            self.log_message(f"Error loading calibration.json: {e}")
+            return None
 
     def set_app_icon(self, icon_filename: str):
         try:
@@ -121,6 +169,16 @@ class BotManagerApp(ctk.CTk):
                                         fg_color="red", state="disabled", corner_radius=0)
         self.stop_button.pack(side="left", padx=10)
 
+        """ Calibration """
+        calibrate_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
+        calibrate_frame.pack(pady=10, fill="x")
+
+        calibrate_map_btn = ctk.CTkButton(calibrate_frame, text="Калибровать карту",
+                                          command=lambda: self.select_rect("map_rect"))
+        calibrate_map_btn.pack(pady=2, fill="x")
+
+        """ ------ """
+
         self.ingame_label = ctk.CTkLabel(main_frame, text="Ingame: False", font=ctk.CTkFont(size=14, weight="bold"))
         self.ingame_label.pack(padx=10)
 
@@ -131,7 +189,19 @@ class BotManagerApp(ctk.CTk):
         self.log_text = ctk.CTkTextbox(main_frame, height=300, corner_radius=0)
         self.log_text.pack(fill="both", expand=True, pady=10)
         self.log_text.configure(state="disabled")
-    
+
+
+        """ Overlay """
+        self.overlay_button = ctk.CTkButton(calibrate_frame, text="Показать оверлей (F1)",
+                                            command=self.toggle_overlay, fg_color="purple")
+        self.overlay_button.pack(pady=10, fill="x")
+
+        self.bind("<F1>", lambda e: self.toggle_overlay())
+
+        """ ------ """
+
+    def toggle_overlay(self):
+        self.overlay.toggle()
 
     def log_message(self, message: str):
         self.after(0, self._add_log_message, message)
@@ -200,11 +270,10 @@ class BotManagerApp(ctk.CTk):
                         button_center = (max_loc[0] + template.shape[1]//2, 
                                         max_loc[1] + template.shape[0]//2)
                         pyautogui.click(button_center)
-                        self.log_message(f"Click: {debug_name}")
                     return True
             return False
         except Exception as e:
-            self.log_message(f"Ошибка в find_picture: {str(e)}")
+            self.log_message(f"find_picture error: {str(e)}")
             return False
     
     def check_ingame(self) -> bool:
@@ -237,13 +306,11 @@ class BotManagerApp(ctk.CTk):
                 
                 
                 self.ingame = self.check_ingame()
-                self.log_message("Ingame: " + str(self.ingame))
-
-
                 if self.ingame:
                     self.hero_bot.run_in_game()
                 
                 time.sleep(random.uniform(1, 2))
+
         except Exception as e:
             self.log_message(f"Bot loop error: {e}")
         

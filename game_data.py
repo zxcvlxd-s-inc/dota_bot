@@ -11,11 +11,9 @@ class GameData:
 
         self.on_update_callback: Optional[Callable[[dict], None]] = None
         
-        # Отключаем спам Flask в консоль
         log = logging.getLogger('werkzeug')
         log.setLevel(logging.ERROR)
 
-        # Маршрут, на который Дота шлет POST-запросы
         @self.app.route('/', methods=['POST'])
         def update():
             new_data = request.json
@@ -28,7 +26,6 @@ class GameData:
             return '', 200
 
     def start(self):
-        """Запуск сервера в отдельном потоке"""
         server_thread = threading.Thread(target=self._run, daemon=True)
         server_thread.start()
         print(f"GSI Server started on port {self.port}")
@@ -43,7 +40,6 @@ class GameData:
 
     @property
     def health_percent(self) -> int:
-        # GSI отдает процент от 0 до 100
         return self.data.get('hero', {}).get('health_percent', 100)
 
     @property
@@ -60,13 +56,11 @@ class GameData:
 
     @property
     def is_ingame(self) -> bool:
-        # Проверка, находится ли игрок непосредственно в матче
         return self.map_name != ""
 
     @property
     def team(self) -> str:
         """Возвращает 'radiant', 'dire' или 'none'"""
-        # Данные лежат в player -> team_name
         return self.data.get('player', {}).get('team_name', "none").lower()
 
     @property
@@ -79,7 +73,6 @@ class GameData:
 
     @property
     def position(self) -> tuple[float, float]:
-        """Возвращает (x, y) героя на карте Доты (от -8000 до 8000)"""
         pos = self.data.get('hero', {}).get('xpos'), self.data.get('hero', {}).get('ypos')
         if pos[0] is not None:
             return float(pos[0]), float(pos[1])

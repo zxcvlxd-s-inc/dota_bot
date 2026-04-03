@@ -91,9 +91,7 @@ class HeroBot:
     def on_update(self, _data = None):
         #if self.game_data.health_percent <= 50:
         #    self.auto_go_to_fountain()
-        
-        print(self.world_to_minimap(self.game_data.position[0], self.game_data.position[1]))
-        self.log(str(self.game_data.position))
+        pass
 
 
     def should_act(self):
