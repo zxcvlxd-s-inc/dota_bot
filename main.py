@@ -35,7 +35,7 @@ class BotManagerApp(ctk.CTk):
         
         self.title("Bot Manager")
         self.geometry("600x800")
-        self.set_app_icon("icon.png")
+        #self.set_app_icon("icon.png")
 
         self.world_rects = {}
 
@@ -57,16 +57,16 @@ class BotManagerApp(ctk.CTk):
                 "dire_hard_lane": Rect(Vector(363, 786), Vector(7, 7)),
             }
 
-        self.overlay = OverlayVisualizer(self.world_rects, scale=0.6)
  
 
-        self.ingame: bool = False
         self.running: bool = False
         
-        self.gsi = GameData()
-        self.gsi.start()
+        self.gsi = GameData()   
 
-        self.hero_bot:HeroBot = HeroBot(self.gsi, self.world_rects, log_callback=self.log_message)
+        self.hero_bot:HeroBot = HeroBot(self, gsi=self.gsi, log_callback=self.log_message)
+        self.overlay = OverlayVisualizer(world_rects=self.world_rects, gsi=self.gsi, scale=0.6)
+        
+        self.gsi.start()
         
         self.accept_templates_dir: str = "img/accept_btn/"
         self.play_btn_templates_dir: str = "img/play_btn/"
@@ -181,7 +181,7 @@ class BotManagerApp(ctk.CTk):
         main_frame.pack(fill="both", expand=True, padx=20, pady=20)
 
         
-        title_label = ctk.CTkLabel(main_frame, text="Dota 2 AFK Bot Manager",
+        title_label = ctk.CTkLabel(main_frame, text="Dota 2 AzFK Bot Manager",
                                   font=main_font)
         title_label.pack(pady=20)
         
@@ -268,7 +268,7 @@ class BotManagerApp(ctk.CTk):
             self.status_label.configure(text="Status: Inactive")
             self.log_message("Bot stopped")
 
-    
+
     def get_images_from_directory(self, directory_path: str):
         image_extensions = ['.png', '.jpg', '.jpeg', '.webp']
         
@@ -343,8 +343,7 @@ class BotManagerApp(ctk.CTk):
                         continue
                 
                 
-                self.ingame = self.check_ingame()
-                if self.ingame and self.is_dota_active():
+                if self.gsi.game_state == "in_game" and self.is_dota_active():
                     self.hero_bot.run_in_game()
                 
                 time.sleep(0.5)

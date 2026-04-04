@@ -4,7 +4,7 @@ from custom_math import Rect, Vector
 
 class ScreenRectSelector:
     def __init__(self):
-
+        # Инициализируем все атрибуты
         self.callback = None
         self.selection_window = None
         self.canvas = None
@@ -15,11 +15,13 @@ class ScreenRectSelector:
     def select_rect(self, name: str, on_selected):
         self.selected_name = name
         self.callback = on_selected
-
-
         self.start_selection()
 
     def start_selection(self):
+        # Убедимся, что предыдущее окно закрыто
+        if self.selection_window is not None:
+            self.cleanup()
+
         self.selection_window = tk.Toplevel()
         self.selection_window.attributes("-fullscreen", True)
         self.selection_window.attributes("-topmost", True)
@@ -33,32 +35,33 @@ class ScreenRectSelector:
         self.canvas.bind("<ButtonPress-1>", self.on_mouse_press)
         self.canvas.bind("<B1-Motion>", self.on_mouse_drag)
         self.canvas.bind("<ButtonRelease-1>", self.on_mouse_release)
-
         self.selection_window.bind("<Escape>", self.on_escape)
 
         self.selection_window.focus_force()
 
     def on_mouse_press(self, event):
-        if self.canvas:
-            self.rect_start = (event.x, event.y)
-
-            if self.current_rect:
+        self.rect_start = (event.x, event.y)
+        if self.current_rect:
+            if self.canvas:
                 self.canvas.delete(self.current_rect)
-            self.current_rect = None
+        self.current_rect = None  # Сбросим текущий прямоугольник
 
     def on_mouse_drag(self, event):
-        if not self.rect_start:
+        if not self.rect_start or not self.canvas:
             return
-        if self.canvas:
-            x1, y1 = self.rect_start
-            x2, y2 = event.x, event.y
 
-            if self.current_rect:
-                self.canvas.delete(self.current_rect)
-            self.current_rect = self.canvas.create_rectangle(
-                x1, y1, x2, y2,
-                outline="red", width=2, fill="lightcoral"
-            )
+        x1, y1 = self.rect_start
+        x2, y2 = event.x, event.y
+
+        # Удаляем старый прямоугольник
+        if self.current_rect:
+            self.canvas.delete(self.current_rect)
+
+        # Рисуем новый
+        self.current_rect = self.canvas.create_rectangle(
+            x1, y1, x2, y2,
+            outline="red", width=2, fill="lightcoral"
+        )
 
     def on_mouse_release(self, event):
         if not self.rect_start:
@@ -82,12 +85,18 @@ class ScreenRectSelector:
         self.cleanup()
 
     def cleanup(self):
+        """Безопасная очистка — без `del`"""
         if self.selection_window:
-            self.selection_window.unbind("<Escape>")
-            self.selection_window.destroy()
-        del self.selection_window
-        del self.canvas
-        del self.rect_start
-        del self.current_rect
-        del self.selected_name 
-        del self.callback
+            try:
+                self.selection_window.unbind("<Escape>")
+                self.selection_window.destroy()
+            except tk.TclError:
+                pass  # Окно уже уничтожено
+            self.selection_window = None
+
+        self.canvas = None
+        self.rect_start = None
+        self.current_rect = None
+        self.selected_name = None
+        self.callback = None
+        # Не используем `del` — просто обнуляем ссылки

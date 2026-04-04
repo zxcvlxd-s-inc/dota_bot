@@ -1,15 +1,20 @@
 import tkinter as tk
-from custom_math import Rect
+from custom_math import Rect, Vector
 
+from game_data import GameData
 
 class OverlayVisualizer:
-    def __init__(self, world_rects: dict, scale: float = 0.8):
+    def __init__(self, world_rects: dict, gsi:GameData, scale: float = 0.8):
         self.world_rects = world_rects
         self.scale = scale
         self.root = None
         self.canvas = None
         self.update_id = None
         self.is_visible = False
+        self.gsi = gsi
+
+
+        self.gsi.callbacks.append(self.on_sgi_update)
 
     def start(self):
         if self.root is not None:
@@ -35,6 +40,34 @@ class OverlayVisualizer:
         self.root.bind("<Escape>", self.stop)
 
         self.update_id = self.root.after(2000, self.update_overlay)
+
+    def on_sgi_update(self, new_data):
+        if self.is_visible:
+            if self.canvas:
+                self.canvas.delete("pos_text")
+
+                self.canvas.create_text(
+                    250, 50,
+                    text=f"position: {self.gsi.position}",
+                    fill="white",
+                    font=("Consolas", 16, "bold"),
+                    tags="pos_text"
+                )
+                
+
+    def world_to_minimap(self, world_x: float, world_y: float) -> tuple[int, int]:
+        MAP_MIN, MAP_MAX = -8192, 8192
+        MAP_SIZE = MAP_MAX - MAP_MIN #16384
+        
+        map_rect:Rect = Rect(Vector(159, 756), Vector(233, 233))
+
+        norm_x = (world_x - MAP_MIN) / MAP_SIZE
+        norm_y = 1 - ((world_y - MAP_MIN) / MAP_SIZE)
+
+        screen_x = int(map_rect.position.x + (norm_x * map_rect.size.x))
+        screen_y = int(map_rect.position.y + (norm_y * map_rect.size.y))
+        
+        return screen_x, screen_y
 
     def draw_rects(self):
         if not self.canvas:
