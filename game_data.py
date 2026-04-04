@@ -28,6 +28,7 @@ class GameData:
 
             self.data = new_data
 
+           # print(self.items)
 
             for cb in self.callbacks:
                 cb(self.data)
@@ -43,26 +44,58 @@ class GameData:
     def _run(self):
         self.app.run(port=self.port, debug=False, use_reloader=False)
 
+    @property
+    def items(self) -> list:
+        return self.data.get("items", {}).values()
+
     def get_item(self, item_name: str) -> dict:
-        for item in self.items:
-            if item.get("name") == item_name:
-                return item
+        for item_data in self.items:
+            if item_data.get("name") == item_name:
+                return item_data
         return {}
 
+    def get_item_with_slot(self, item_name: str) -> tuple[Optional[dict], Optional[int]]:
+        items_dict = self.data.get("items", {})
+        
+        for slot_key, item_data in items_dict.items():
+            if item_data.get("name") == item_name:
+                try:
+                    slot_idx = int(slot_key.replace("slot", ""))
+                    return item_data, slot_idx
+                except (ValueError, TypeError):
+                    continue
+        return None, None
 
     def can_use_item(self, item_name: str) -> bool:
-        item:dict = self.get_item(item_name)
-        print(item)
+        item = self.get_item(item_name)
         if item == {}:
+            print("[can_use_item] item == {} is True")
             return False
         
-        print(str(item.get("cooldown")))
-        return item.get("cooldown") == 0
-        
+        if item.get("cooldown", 1) > 0:
+            print(f"[can_use_item] item in cooldown ({item.get("cooldown", 1)}s remaining)")
+            return False
 
-    @property
-    def items(self) -> dict:
-        return self.data.get("items", {}).values()
+        return True
+
+    def get_save_items(self, can_use:bool = True) -> list:
+        result = []
+        save_list = [
+            "item_glimmer_cape", "item_mekansm", "item_black_king_bar",
+            "item_pipe", "item_cyclone", "item_aeon_disk", "item_crimson_guard"
+        ]
+
+        for item in self.items:
+            if item.get("name") in save_list:
+
+                if can_use:
+                    if item.get("cooldown", 1) == 0:
+                        result.append(item)
+                else:
+                    result.append(item)
+
+        return result
+
 
     @property
     def game_state(self) -> str:

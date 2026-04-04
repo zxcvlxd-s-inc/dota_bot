@@ -44,16 +44,42 @@ class OverlayVisualizer:
     def on_sgi_update(self, new_data):
         if self.is_visible:
             if self.canvas:
-                self.canvas.delete("pos_text")
+                self.canvas.delete("sex_text")
 
                 self.canvas.create_text(
                     250, 50,
                     text=f"position: {self.gsi.position}",
                     fill="white",
                     font=("Consolas", 16, "bold"),
-                    tags="pos_text"
+                    tags="sex_text"
                 )
                 
+                self.canvas.create_text(
+                    450, 100,
+                    text=f"distance to base: {self.distance_to_base()}",
+                    fill="white",
+                    font=("Consolas", 16, "bold"),
+                    tags="sex_text"
+                )
+
+
+    def distance_to_world_pos(self, x: float, y: float) -> float:
+        hero_x, hero_y = self.gsi.position
+        dx = hero_x - x
+        dy = hero_y - y
+        return (dx**2 + dy**2) ** 0.5
+    
+    def distance_to_base(self) -> float:
+        center:Vector = Vector(0, 0)
+        if self.gsi.is_radiant:
+            center = Vector(-7000, -6500)
+        if self.gsi.is_dire:
+            rect = Vector(7000, 6500)
+        
+        return self.distance_to_world_pos(center.x, center.y)
+
+
+
 
     def world_to_minimap(self, world_x: float, world_y: float) -> tuple[int, int]:
         MAP_MIN, MAP_MAX = -8192, 8192

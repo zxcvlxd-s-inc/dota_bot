@@ -32,14 +32,18 @@ class HeroBot:
 
         self.quick_buy_added:bool = False
         self.quick_buy:list[DotaItem] = [
-            DotaItem("item_wraith_band"),
+            DotaItem("item_bracer"),
+            DotaItem("item_bracer"),
             DotaItem("item_boots"),
-            DotaItem("item_mekansm"),
-            DotaItem("item_travel_boots"),
             DotaItem("item_glimmer_cape"),
+            DotaItem("item_aeon_disk"),
+            DotaItem("item_travel_boots"),
+            DotaItem("item_crimson_guard"),
+            DotaItem("item_pipe"),
         ]
         
         self.spell_binds:list = ["q", "w", "e", "d", "f", "r"]
+        self.item_binds:list = [" ", "c", "3", "v", "x", "n"]
         self.tp_bind:str = "4"
 
         if self.should_pick_lane():
@@ -55,6 +59,10 @@ class HeroBot:
                     if self.current_lane:
                         self.attack_rect(self.current_lane)
                 
+                if not self.should_save():
+                    ridx = random.randrange(0, 101)
+                    if ridx < 50:
+                        self.press_spell(random.randrange(0, len(self.spell_binds)))
 
             time.sleep(random.randrange(2, 6))
 
@@ -90,9 +98,71 @@ class HeroBot:
             self.in_interface = False
             self.quick_buy_added = True
 
+    def add_item_to_quickbuy(self, item_id:str):
+        pyautogui.press("f4")
+        time.sleep(random.uniform(0.11, 0.21))
+        item = DotaItem(item_id)
+        target_item_name = item.get_humanized_name()
+        for char in target_item_name:
+            pyautogui.press(char)
+            time.sleep(random.uniform(0.05, 0.15))
+        
+        pyautogui.hotkey('ctrl', 'shift', "enter")
+        self.log(f"{self.gsi.hero_name}: quickbuy added {item.id_name}")
+        pyautogui.hotkey('ctrl', 'a')
+        time.sleep(random.uniform(0.05, 0.15))
+        pyautogui.press("backspace")
+        time.sleep(random.uniform(0.05, 0.15))
+
+        pyautogui.press("escape")
+
+    def press_item(self, item_id: str, use_alt = False):
+        if not self.gsi.can_use_item(item_id):
+            print(1)
+            return False
+
+        if item_id != "item_tpscroll":
+            item_data, slot = self.gsi.get_item_with_slot(item_id)
+
+            if item_data is None or slot is None:
+                print(2)
+                return False
+
+            key = None
+            if 0 <= slot < len(self.item_binds):
+                key = self.item_binds[slot]
+
+            if not key:
+                print(3)
+                return False
+
+            self.select_hero(move_camera=False)
+
+            if item_id == "item_glimmer_cape":
+                use_alt = True
+        else:
+            key = self.tp_bind
+
+
+        try:
+            if use_alt:
+                pyautogui.hotkey('alt', key)
+                self.log(f"{self.gsi.hero_name}: used {item_id} (Alt+{key})")
+            else:
+                pyautogui.press(key)
+                self.log(f"{self.gsi.hero_name}: used {item_id} ({key})")
+
+            time.sleep(random.uniform(0.05, 0.1))
+            return True
+
+        except Exception as e:
+            self.log(f"Error using {item_id}: {e}")
+            return False
+
+
     def pick_random_lane(self):
         rand_idx = random.randrange(0, 3)
-        target_lane = "" #"safe_lane"
+        target_lane = ""
         if rand_idx == 0:
             target_lane = "safe_lane"
         elif rand_idx == 1:
@@ -120,6 +190,12 @@ class HeroBot:
         
         if self.log_callback:
             self.log_callback(full_message)
+
+    def press_spell(self, spell_idx:int):
+        self.select_hero()
+        key = self.spell_binds[spell_idx]
+        pyautogui.press(key)
+        self.human_click(960, 540)
 
     def world_to_minimap(self, world_x: float, world_y: float) -> tuple[int, int]:
         MAP_MIN, MAP_MAX = -8192, 8192 
@@ -167,9 +243,13 @@ class HeroBot:
         return (dx**2 + dy**2) ** 0.5
 
     def distance_to_base(self) -> float:
-        rect = self.get_team_base_rect()
-        rect_center = rect.get_center() 
-        return self.distance_to_world_pos(rect_center.x, rect_center.y)
+        center:Vector = Vector(0, 0)
+        if self.gsi.is_radiant:
+            center = Vector(-7000, -6500)
+        if self.gsi.is_dire:
+            rect = Vector(7000, 6500)
+        
+        return self.distance_to_world_pos(center.x, center.y)
 
 
     def move_to_world_pos(self, x, y):
@@ -177,8 +257,9 @@ class HeroBot:
         self.human_click(screen_x, screen_y, mouse_button="right")
 
 
-    def go_to_base(self):
-        self.select_hero()
+    def go_to_base(self, select_hero:bool = True):
+        if select_hero:
+            self.select_hero()
         rect:Rect = self.get_team_base_rect()
         pos = rect.get_random_point()
         self.human_click(pos.x, pos.y, mouse_button="right")
@@ -215,14 +296,20 @@ class HeroBot:
 
     def save_yourself(self):
         self.select_hero()
+        
+    
+        save_items = self.gsi.get_save_items()
+        for save_item in save_items:
+            self.press_item(save_item["name"])
+
         if self.distance_to_base() > 4500:
             if self.bot_manager.gsi.can_use_item("item_tpscroll"):
-                pyautogui.hotkey('alt', self.tp_bind)
+                self.press_item("item_tpscroll", use_alt=True)
                 self.log(f"{self.gsi.hero_name}: saving by tp")
                 return
 
+        self.go_to_base(select_hero=False)
         self.log(f"{self.gsi.hero_name}: saving")
-        self.go_to_base()
 
     def should_save(self) -> bool:
         if not self.can_act(check_interface=False):
@@ -230,7 +317,6 @@ class HeroBot:
         return self.gsi.health_percent <= 60
 
     def on_update(self, _data = {}):
-        #self.log(f"On update")
         if self.should_save():
             self.save_yourself()
             
@@ -263,4 +349,3 @@ class HeroBot:
         
         if not self.quick_buy_added:
             self.add_quickbuy()
-  

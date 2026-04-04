@@ -343,8 +343,11 @@ class BotManagerApp(ctk.CTk):
                         continue
                 
                 
-                if self.gsi.game_state == "in_game" and self.is_dota_active():
-                    self.hero_bot.run_in_game()
+                elif self.gsi.game_state == "in_game":
+                    if self.is_dota_active():
+                        self.hero_bot.run_in_game()
+                        self.find_picture(self.get_images_from_directory(self.up_spell_templates_dir), 
+                                click=True, debug_name="Upgrade Spell")
                 
                 time.sleep(0.5)
 
