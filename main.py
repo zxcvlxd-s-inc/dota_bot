@@ -257,6 +257,7 @@ class BotManagerApp(ctk.CTk):
             self.status_label.configure(text="Status: Active")
             self.log_message("Bot is running")
 
+
             self.bot_thread = threading.Thread(target=self.bot_loop, daemon=True)
             self.bot_thread.start()
     
@@ -338,6 +339,7 @@ class BotManagerApp(ctk.CTk):
                         continue
                 
                 elif self.gsi.game_state == "hero_selection":
+                    self.hero_bot.quick_buy_added = False
                     if self.find_picture(self.get_images_from_directory(self.rand_hero_templates_dir), 
                                         click=True, debug_name="Random Hero"):
                         continue

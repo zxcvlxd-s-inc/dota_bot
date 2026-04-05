@@ -118,14 +118,12 @@ class HeroBot:
 
     def press_item(self, item_id: str, use_alt = False):
         if not self.gsi.can_use_item(item_id):
-            print(1)
             return False
 
         if item_id != "item_tpscroll":
             item_data, slot = self.gsi.get_item_with_slot(item_id)
 
             if item_data is None or slot is None:
-                print(2)
                 return False
 
             key = None
@@ -133,7 +131,6 @@ class HeroBot:
                 key = self.item_binds[slot]
 
             if not key:
-                print(3)
                 return False
 
             self.select_hero(move_camera=False)
